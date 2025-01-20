@@ -16,11 +16,12 @@ suite('Functional Tests', function () {
         .keepOpen()
         .get('/hello')
         .end(function (err, res) {
-          assert.fail(res.status, 200);
-          assert.fail(res.text, 'hello Guest');
+          assert.equal(res.status, 200);
+          assert.equal(res.text, 'hello Guest');
           done();
         });
     });
+
     // #2
     test('Test GET /hello with your name', function (done) {
       chai
@@ -28,58 +29,108 @@ suite('Functional Tests', function () {
         .keepOpen()
         .get('/hello?name=xy_z')
         .end(function (err, res) {
-          assert.fail(res.status, 200);
-          assert.fail(res.text, 'hello xy_z');
+          assert.equal(res.status, 200);
+          assert.equal(res.text, 'hello xy_z');
           done();
         });
     });
+
     // #3
     test('Send {surname: "Colombo"}', function (done) {
       chai
         .request(server)
         .keepOpen()
         .put('/travellers')
-
+        .send({ surname: 'Colombo' })
         .end(function (err, res) {
-          assert.fail();
-
+          assert.equal(res.status, 200);
+          assert.equal(res.type, 'application/json');
+          assert.equal(res.body.name, 'Cristoforo');
+          assert.equal(res.body.surname, 'Colombo');
           done();
         });
     });
+
     // #4
     test('Send {surname: "da Verrazzano"}', function (done) {
-      assert.fail();
-
-      done();
+      chai
+        .request(server)
+        .keepOpen()
+        .put('/travellers')
+        .send({ surname: 'da Verrazzano' })
+        .end(function (err, res) {
+          assert.equal(res.status, 200);
+          assert.equal(res.type, 'application/json');
+          assert.equal(res.body.name, 'Giovanni');
+          assert.equal(res.body.surname, 'da Verrazzano');
+          done();
+        });
     });
   });
 });
 
 const Browser = require('zombie');
 
+Browser.site = 'http://0.0.0.0:3000'; // Definindo o site base para o browser
+
 suite('Functional Tests with Zombie.js', function () {
   this.timeout(5000);
 
+  const browser = new Browser(); // Instanciando o browser
 
+  suiteSetup(function (done) {
+    return browser.visit('/', done); // Visitando a página inicial
+  });
 
   suite('Headless browser', function () {
-    test('should have a working "site" property', function() {
-      assert.isNotNull(browser.site);
+    test('should have a working "site" property', function () {
+      assert.isNotNull(browser.site); // Verifica se a propriedade 'site' está definida
     });
   });
 
   suite('"Famous Italian Explorers" form', function () {
     // #5
     test('Submit the surname "Colombo" in the HTML form', function (done) {
-      assert.fail();
-
-      done();
+      browser
+        .fill('surname', 'Colombo')
+        .then(() => {
+          browser.pressButton('submit', () => {
+            // Verificar se a requisição foi bem-sucedida
+            browser.assert.success();
+            // Verificar o texto no elemento span#name
+            browser.assert.text('span#name', 'Cristoforo');
+            // Verificar o texto no elemento span#surname
+            browser.assert.text('span#surname', 'Colombo');
+            // Verificar a existência e contagem de elementos span#dates
+            browser.assert.elements('span#dates', 1);
+            done();
+          });
+        });
     });
+
     // #6
     test('Submit the surname "Vespucci" in the HTML form', function (done) {
-      assert.fail();
+      browser
+        .fill('surname', 'Vespucci')  // Preenche o formulário com o sobrenome Vespucci
+        .then(() => {
+          browser.pressButton('submit', () => {  // Clica no botão de envio
+            // Afirma que a requisição foi bem-sucedida (status 200)
+            browser.assert.success();
 
-      done();
+            // Afirma que o texto dentro de span#name seja 'Amerigo'
+            browser.assert.text('span#name', 'Amerigo');
+
+            // Afirma que o texto dentro de span#surname seja 'Vespucci'
+            browser.assert.text('span#surname', 'Vespucci');
+
+            // Afirma que há um elemento span#dates
+            browser.assert.elements('span#dates', 1);
+
+            done();  // Sinaliza que o teste terminou
+          });
+        });
     });
+
   });
 });
+
