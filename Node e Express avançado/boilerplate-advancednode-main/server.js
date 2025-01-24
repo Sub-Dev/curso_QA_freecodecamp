@@ -1,9 +1,8 @@
-'use strict';
 require('dotenv').config();
 const express = require('express');
 const session = require('express-session');
 const passport = require('passport');
-const LocalStrategy = require('passport-local').Strategy; // Importa a estratégia local
+const LocalStrategy = require('passport-local').Strategy;
 const { ObjectID } = require('mongodb');
 const myDB = require('./connection');
 const fccTesting = require('./freeCodeCamp/fcctesting.js');
@@ -33,6 +32,14 @@ app.use(passport.session());
 app.set('view engine', 'pug');
 app.set('views', './views/pug');
 
+// Middleware para verificar autenticação
+function ensureAuthenticated(req, res, next) {
+  if (req.isAuthenticated()) {
+    return next(); // Prossegue para a próxima função se autenticado
+  }
+  res.redirect('/'); // Redireciona para a página inicial caso não esteja autenticado
+}
+
 // Conexão ao banco de dados e configuração de rotas
 myDB(async client => {
   const myDataBase = await client.db('database').collection('users');
@@ -61,36 +68,51 @@ myDB(async client => {
     });
   });
 
-  // Rotas principais
-  app.route('/').get((req, res) => {
-    res.render('index', {
-      title: 'Connected to Database',
-      message: 'Please login'
-    });
-  });
-
-  // Rota de login (POST)
-  app.route('/login').post(passport.authenticate('local', {
-    successRedirect: '/profile', // Redireciona para a página de perfil em caso de sucesso
-    failureRedirect: '/', // Redireciona para a página inicial em caso de falha
-    failureFlash: false
-  }));
-
-  // Rota de perfil do usuário
-  app.route('/profile').get((req, res) => {
-    if (!req.isAuthenticated()) {
-      return res.redirect('/');
-    }
-    res.render('profile', {
-      title: 'Profile',
-      user: req.user
-    });
-  });
-
 }).catch(e => {
+  console.error('Database connection error:', e);
+  // Caso a conexão com o banco falhe, renderiza a página inicial com mensagem de erro
   app.route('/').get((req, res) => {
-    res.render('index', { title: e, message: 'Unable to connect to database' });
+    res.render('index', { title: 'Database Error', message: 'Unable to connect to database' });
   });
+});
+
+// Rota principal (/)
+app.route('/').get((req, res) => {
+  res.render('index', {
+    title: 'Connected to Database',
+    message: 'Please login',
+    showLogin: true // Exibe o formulário de login
+  });
+});
+
+// Rota de login (POST)
+app.route('/login').post(passport.authenticate('local', {
+  successRedirect: '/profile', // Redireciona para a página de perfil em caso de sucesso
+  failureRedirect: '/', // Redireciona para a página inicial em caso de falha
+  failureFlash: false
+}));
+
+// Rota de perfil do usuário com o middleware ensureAuthenticated
+app.route('/profile').get(ensureAuthenticated, (req, res) => {
+  res.render('profile', {
+    title: 'Profile',
+    username: req.user.username // Passa o nome de usuário para a visualização
+  });
+});
+
+// Rota de logout
+app.route('/logout').get((req, res, next) => {
+  console.log('Logout route accessed');
+  req.logout();  // Remova o uso do callback assíncrono
+  console.log('User logged out successfully');
+  res.redirect('/'); // Redireciona para a página inicial após o logout
+});
+
+// Middleware para tratar páginas não encontradas (404)
+app.use((req, res, next) => {
+  res.status(404)
+    .type('text')
+    .send('Not Found');
 });
 
 // Inicia o servidor
